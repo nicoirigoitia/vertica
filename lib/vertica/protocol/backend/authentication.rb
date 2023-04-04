@@ -12,6 +12,7 @@ module Vertica
       GSS                 = 7
       GSS_CONTINUE        = 8
       SSPI                = 9
+      SHA256_PASSWORD     = 10
 
       attr_reader :code
       attr_reader :salt

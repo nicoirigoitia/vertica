@@ -385,14 +385,39 @@ class Vertica::Connection
     end
   end
 
+  # def startup_connection
+  #   write_message(Vertica::Protocol::Startup.new(@options[:username], @options[:database]))
+  #   message = nil
+  #   begin
+  #     case message = read_message
+  #     when Vertica::Protocol::Authentication
+  #       if message.code != Vertica::Protocol::Authentication::OK
+  #         write_message(Vertica::Protocol::Password.new(@options[:password], auth_method: message.code, user: @options[:username], salt: message.salt))
+  #       end
+  #     else
+  #       process_message(message)
+  #     end
+  #   end until message.kind_of?(Vertica::Protocol::ReadyForQuery)
+  # end
+
   def startup_connection
     write_message(Vertica::Protocol::Startup.new(@options[:username], @options[:database]))
     message = nil
+
     begin
       case message = read_message
       when Vertica::Protocol::Authentication
-        if message.code != Vertica::Protocol::Authentication::OK
-          write_message(Vertica::Protocol::Password.new(@options[:password], auth_method: message.code, user: @options[:username], salt: message.salt))
+        if message.code == Vertica::Protocol::Authentication::CLEARTEXT_PASSWORD
+          write_message(Vertica::Protocol::Password.new(@options[:password], user: @options[:username]))
+        elsif message.code == Vertica::Protocol::Authentication::GSS
+          # TODO: Handle GSS authentication
+          raise NotImplementedError, "GSS authentication not implemented"
+        elsif message.code == Vertica::Protocol::Authentication::SHA256_PASSWORD
+          password = "#{@options[:password]}#{@options[:username]}"
+          hashed_password = Digest::SHA256.hexdigest(password).unpack1("H*")
+          write_message(Vertica::Protocol::Password.new(hashed_password, auth_method: message.code, user: @options[:username]))
+        else
+          raise ArgumentError, "Unsupported authentication method: #{message.code}"
         end
       else
         process_message(message)
